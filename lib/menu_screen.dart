@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'add_ingredient_screen.dart';
 import 'onboarding_screen.dart';
+import 'ingredients_list_screen.dart';
 
 class MenuScreen extends StatelessWidget {
   const MenuScreen({super.key});
@@ -114,6 +115,16 @@ class MenuScreen extends StatelessWidget {
                           builder: (_) => const AddIngredientScreen(),
                         ),
                       );
+                    },
+                  ),
+                  const SizedBox(height: 14),
+                  _MenuCard(
+                    icon: Icons.list_alt,
+                    title: 'Ingredients',
+                    subtitle: 'View and manage your ingredients',
+                    color: const Color(0xFFE8F7EF),
+                    onTap: () {
+                      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const IngredientsListScreen()));
                     },
                   ),
                   const SizedBox(height: 14),

@@ -1,11 +1,23 @@
 import 'package:flutter/material.dart';
 import 'menu_screen.dart';
 import 'database_helper.dart';
+import 'auth_service.dart';
 
+// Initialize AuthService (device UUID) before opening DB so migration can set ownership
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await DatabaseHelper.instance.database;
+  await AuthService.instance.init();
+
+  final db = await DatabaseHelper.instance.database;
+
+  // After DB opened and migration ran (which added the column), ensure existing rows
+  // are assigned to the device userId if they are null.
+  final currentUserId = AuthService.instance.getCurrentUserIdSync();
+  await db.rawUpdate(
+    'UPDATE ${DatabaseHelper.ingredientTable} SET userId = ? WHERE userId IS NULL',
+    [currentUserId],
+  );
 
   runApp(const MyApp());
 }

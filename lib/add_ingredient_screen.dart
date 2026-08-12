@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'database_helper.dart';
+import 'ingredient_repository.dart';
+import 'auth_service.dart';
+import 'package:intl/intl.dart';
 
 class AddIngredientScreen extends StatefulWidget {
-  const AddIngredientScreen({super.key});
+  final IngredientRepository? repository;
+
+  const AddIngredientScreen({super.key, this.repository});
 
   @override
   State<AddIngredientScreen> createState() => _AddIngredientScreenState();
@@ -13,6 +18,7 @@ class _AddIngredientScreenState extends State<AddIngredientScreen> {
   final _nameController = TextEditingController();
   final _quantityController = TextEditingController();
   final _expiryController = TextEditingController();
+  DateTime? _selectedExpiry;
   final _noteController = TextEditingController();
 
   @override
@@ -27,12 +33,39 @@ class _AddIngredientScreenState extends State<AddIngredientScreen> {
   Future<void> _saveIngredient() async {
     if (!_formKey.currentState!.validate()) return;
 
-    await DatabaseHelper.instance.insertIngredient({
+    final currentUserId = AuthService.instance.getCurrentUserIdSync();
+
+    // expiry stored in ISO yyyy-MM-dd; if user picked a date, use that
+    String? expiryIso;
+    if (_selectedExpiry != null) {
+      expiryIso = DateFormat('yyyy-MM-dd').format(_selectedExpiry!);
+    } else if (_expiryController.text.trim().isNotEmpty) {
+      // backwards-compatible parsing of manually entered legacy values
+      try {
+        final parsed = DateFormat(
+          'dd/MM/yyyy',
+        ).parseStrict(_expiryController.text.trim());
+        expiryIso = DateFormat('yyyy-MM-dd').format(parsed);
+      } catch (_) {
+        try {
+          final parsed = DateTime.parse(_expiryController.text.trim());
+          expiryIso = DateFormat('yyyy-MM-dd').format(parsed);
+        } catch (_) {
+          expiryIso = _expiryController.text.trim();
+        }
+      }
+    }
+
+    final values = {
       'name': _nameController.text.trim(),
       'quantity': _quantityController.text.trim(),
-      'expiryDate': _expiryController.text.trim(),
+      'expiryDate': expiryIso,
       'note': _noteController.text.trim(),
-    });
+      'userId': currentUserId,
+    };
+
+    final repo = widget.repository ?? DatabaseHelper.instance;
+    await repo.insertIngredient(values);
 
     if (mounted) {
       Navigator.of(context).pop(true);
@@ -174,12 +207,33 @@ class _AddIngredientScreenState extends State<AddIngredientScreen> {
                             horizontal: 20,
                             vertical: 16,
                           ),
-                          child: TextFormField(
-                            controller: _expiryController,
-                            decoration: const InputDecoration(
-                              labelText: 'Expiry Date',
-                              border: InputBorder.none,
-                              hintText: 'dd/MM/yyyy',
+                          child: GestureDetector(
+                            onTap: () async {
+                              final now = DateTime.now();
+                              final picked = await showDatePicker(
+                                context: context,
+                                initialDate: _selectedExpiry ?? now,
+                                firstDate: DateTime(now.year - 5),
+                                lastDate: DateTime(now.year + 10),
+                              );
+                              if (picked != null) {
+                                setState(() {
+                                  _selectedExpiry = picked;
+                                  _expiryController.text = DateFormat(
+                                    'dd/MM/yyyy',
+                                  ).format(picked);
+                                });
+                              }
+                            },
+                            child: AbsorbPointer(
+                              child: TextFormField(
+                                controller: _expiryController,
+                                decoration: const InputDecoration(
+                                  labelText: 'Expiry Date',
+                                  border: InputBorder.none,
+                                  hintText: 'dd/MM/yyyy',
+                                ),
+                              ),
                             ),
                           ),
                         ),
